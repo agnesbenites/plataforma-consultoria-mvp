@@ -1,0 +1,15 @@
+# Arquivos de Sistema e IDEs
+.DS_Store
+.vscode/
+
+# Dependências
+node_modules/
+
+# Arquivos de Log e Cache
+npm-debug.log
+yarn-error.log
+/web-consultor/build
+/mobile/build
+
+# Segredos (CRÍTICO!)
+**/.env
