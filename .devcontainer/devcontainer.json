@@ -1,0 +1,22 @@
+// .devcontainer/devcontainer.json
+
+{
+    "name": "Node.js & React Native Environment",
+    "image": "mcr.microsoft.com/devcontainers/typescript-node:0-20",
+    "features": {
+        "ghcr.io/devcontainers/features/github-cli:1": {
+            "version": "latest"
+        }
+    },
+    "customizations": {
+        "vscode": {
+            "extensions": [
+                "ms-vscode.live-server",
+                "dbaeumer.vscode-eslint",
+                "esbenp.prettier-vscode"
+            ]
+        }
+    },
+    "forwardPorts": [3000, 5000, 8081], // Backend (5000) e Expo/Mobile (8081)
+    "postCreateCommand": "npm install && cd backend && npm install"
+}
