@@ -4,7 +4,7 @@ const express = require('express');
 const http = require('http');
 const dotenv = require('dotenv');
 const userRoutes = require('./routes/userRoutes');
-const supabase = require('./utils/supabaseClient'); // cliente Supabase
+const supabase = require('./utils/supabaseClient');
 
 dotenv.config();
 
