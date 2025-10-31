@@ -3,13 +3,8 @@
   "version": "1.0.0",
   "main": "server.js",
   "scripts": {
-<<<<<<< HEAD
     "start": "node server.js",
     "start:dev": "nodemon server.js"
-=======
-    "start": "node server.js",  // <<< NOVO: Para o Render (Produção)
-    "start:dev": "nodemon server.js" 
->>>>>>> 519fdcaf641770c5e2b1fea60104cee7a6523764
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.78.0",
@@ -20,8 +15,4 @@
   "devDependencies": {
     "nodemon": "^3.1.10"
   }
-<<<<<<< HEAD
 }
-=======
-}
->>>>>>> 519fdcaf641770c5e2b1fea60104cee7a6523764
