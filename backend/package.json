@@ -3,8 +3,8 @@
   "version": "1.0.0",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js",  // <<< NOVO: Para o Render (Produção)
-    "start:dev": "nodemon server.js" 
+    "start": "node server.js",
+    "start:dev": "nodemon server.js"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.78.0",
