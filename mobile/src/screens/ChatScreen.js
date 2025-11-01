@@ -2,102 +2,126 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, StyleSheet, FlatList, TextInput, Button, KeyboardAvoidingView, Platform, Alert } from 'react-native';
-import io from 'socket.io-client';
+import { GiftedChat } from 'react-native-gifted-chat';
+import { supabase } from '../supabase'; // Importa o cliente Supabase
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
-// NOTE: Usamos o IP e Porta do servidor (sem o /api)
-const SOCKET_URL = 'http://192.168.3.76:8080';
-const socket = io(SOCKET_URL, { transports: ['websocket'] });
+// Nota: O GiftedChat usa uma estrutura de mensagens diferente (IDs, user, text, createdAt)
+const mapSupabaseMessage = (msg) => ({
+    _id: msg.id,
+    text: msg.content,
+    createdAt: new Date(msg.created_at),
+    user: {
+        _id: msg.user_id,
+        name: msg.user_type, // 'client' ou 'consultant'
+    },
+});
 
-const ChatScreen = ({ route }) => {
-    // Simulamos que o usuário está logado
-    const [messages, setMessages] = useState([]);
-    const [inputMessage, setInputMessage] = useState('');
-    const [isConnected, setIsConnected] = useState(false);
+const ChatScreen = ({ navigation }) => {
+    // GiftedChat espera o array no formato [mais recente, ..., mais antigo]
+    const [messages, setMessages] = useState([]); 
+    const [userId, setUserId] = useState(null);
 
-    // 1. Efeito para lidar com a conexão Socket.IO
+    // 1. Carregar ID do Usuário e Mensagens Antigas
     useEffect(() => {
-        socket.on('connect', () => {
-            setIsConnected(true);
-            Alert.alert('Chat Ativo', 'Conectado ao servidor de mensagens.');
-        });
+        const loadUserData = async () => {
+            const userDataJson = await AsyncStorage.getItem('user');
+            if (userDataJson) {
+                const userData = JSON.parse(userDataJson);
+                // Usamos o ID do Supabase (que está no token/retorno do login)
+                setUserId(userData._id); 
+            }
+        };
 
-        socket.on('receiveMessage', (messageData) => {
-            // Adiciona a nova mensagem ao topo da lista
-            setMessages((prevMessages) => [messageData, ...prevMessages]);
-        });
+        const fetchMessages = async () => {
+            const { data, error } = await supabase
+                .from('messages')
+                .select('*')
+                .order('created_at', { ascending: false });
 
-        socket.on('disconnect', () => {
-            setIsConnected(false);
-            Alert.alert('Chat Fechado', 'Conexão perdida.');
-        });
+            if (error) {
+                console.error("Erro ao buscar mensagens antigas:", error);
+                Alert.alert("Erro de Chat", "Não foi possível carregar as mensagens.");
+            } else {
+                setMessages(data.map(mapSupabaseMessage));
+            }
+        };
 
-        // Limpa listeners ao desmontar a tela
+        loadUserData();
+        fetchMessages();
+    }, []);
+
+    // 2. Conectar ao Supabase Realtime (Receber Novas Mensagens)
+    useEffect(() => {
+        // 🚨 CRÍTICO: Inscreva-se no canal 'messages' (nome da sua tabela)
+        const chatChannel = supabase
+            .channel('public:messages')
+            .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, (payload) => {
+                // Quando uma nova mensagem é inserida (INSERT)
+                const newMsg = mapSupabaseMessage(payload.new);
+                setMessages(previousMessages => GiftedChat.append(previousMessages, [newMsg]));
+            })
+            .subscribe((status) => {
+                if (status === 'SUBSCRIBED') {
+                    console.log('Realtime Chat Conectado!');
+                }
+            });
+
+        // Limpar a conexão ao sair da tela
         return () => {
-            socket.off('connect');
-            socket.off('receiveMessage');
-            socket.off('disconnect');
-            // IMPORTANTE: Manter o socket.close() desativado no MVP para não fechar a conexão globalmente.
+            supabase.removeChannel(chatChannel);
         };
     }, []);
 
-    const sendMessage = () => {
-        if (inputMessage.trim() && isConnected) {
-            const messageData = {
-                id: Date.now(),
-                text: inputMessage,
-                user: 'Cliente (Você)', // Simulação
-                timestamp: new Date().toLocaleTimeString(),
-            };
-            
-            // Envia a mensagem para o servidor (que a retransmite)
-            socket.emit('sendMessage', messageData); 
-            setInputMessage('');
-        }
-    };
 
-    const renderMessage = ({ item }) => (
-        <View style={styles.messageContainer}>
-            <Text style={styles.messageText}>{item.text}</Text>
-            <Text style={styles.messageUser}>{item.user} - {item.timestamp}</Text>
-        </View>
-    );
+    // 3. Função de Envio (Insere no DB, e o Realtime faz o resto)
+    const onSend = useCallback((newMessages = []) => {
+        if (!userId) {
+            Alert.alert("Erro", "Usuário não autenticado. Faça login novamente.");
+            return;
+        }
+
+        const messageToSend = newMessages[0];
+        
+        // Insere a mensagem no banco de dados. O Realtime (useEffect acima) se encarrega de exibi-la para todos.
+        supabase
+            .from('messages')
+            .insert([
+                { 
+                    user_id: userId,
+                    content: messageToSend.text,
+                    user_type: messageToSend.user.name.toLowerCase() // 'client' ou 'consultant'
+                }
+            ])
+            .then(({ error }) => {
+                if (error) {
+                    console.error("Erro ao enviar mensagem:", error);
+                    Alert.alert("Erro de Envio", "Não foi possível enviar a mensagem.");
+                }
+            });
+            
+    }, [userId]);
+
+
+    if (!userId) {
+        return <View style={styles.loadingContainer}><Text>Carregando dados do usuário...</Text></View>;
+    }
 
     return (
-        <KeyboardAvoidingView 
-            style={{ flex: 1 }}
-            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-            keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 20}
-        >
-            <Text style={styles.statusText}>Status: {isConnected ? 'Conectado' : 'Desconectado'}</Text>
-            <FlatList
-                data={messages}
-                renderItem={renderMessage}
-                keyExtractor={item => item.id.toString()}
-                inverted // Mostra as mais novas no topo
-                contentContainerStyle={styles.listContainer}
-            />
-            
-            <View style={styles.inputContainer}>
-                <TextInput
-                    style={styles.input}
-                    value={inputMessage}
-                    onChangeText={setInputMessage}
-                    placeholder="Digite sua mensagem..."
-                />
-                <Button title="Enviar" onPress={sendMessage} disabled={!isConnected} />
-            </View>
-        </KeyboardAvoidingView>
+        <GiftedChat
+            messages={messages}
+            onSend={onSend}
+            user={{
+                _id: userId,
+                name: 'Cliente', // Determina quem está enviando
+            }}
+            renderUsernameOnMessage={true}
+        />
     );
 };
 
 const styles = StyleSheet.create({
-    statusText: { textAlign: 'center', padding: 10, backgroundColor: '#eee' },
-    listContainer: { paddingHorizontal: 10, paddingTop: 10 },
-    messageContainer: { backgroundColor: '#fff', padding: 10, borderRadius: 10, marginVertical: 4, maxWidth: '80%', alignSelf: 'flex-start' },
-    messageText: { fontSize: 16 },
-    messageUser: { fontSize: 10, color: '#666', marginTop: 3 },
-    inputContainer: { flexDirection: 'row', padding: 10, alignItems: 'center', borderTopWidth: 1, borderColor: '#ccc', backgroundColor: '#fff' },
-    input: { flex: 1, borderWidth: 1, borderColor: '#ccc', borderRadius: 20, paddingHorizontal: 15, paddingVertical: 8, marginRight: 10 },
+    loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
 });
 
 export default ChatScreen;

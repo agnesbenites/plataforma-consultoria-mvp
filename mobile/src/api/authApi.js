@@ -2,10 +2,11 @@
 
 import axios from 'axios';
 
-// ATENÇÃO: Se estiver usando celular ou emulador, substitua 'localhost'
-// pelo SEU ENDEREÇO IP LOCAL (ex: 192.168.1.10).
-// O servidor backend está rodando na porta 8080.
-const BASE_URL = 'http://10.0.2.2:8080/api'; // 10.0.2.2 é o IP padrão para Android Emulator
+// URL PÚBLICA do Render (Substitua se a sua URL do Render for diferente)
+const RENDER_URL = 'https://plataforma-consultoria-mvp.onrender.com'; 
+
+// CRÍTICO: Usa template string (crase) e interpolação para construir o link
+const BASE_URL = `${RENDER_URL}/api`; 
 
 const api = axios.create({
     baseURL: BASE_URL,
@@ -15,10 +16,13 @@ const api = axios.create({
 export const login = async (email, password) => {
     try {
         const response = await api.post('/users/login', { email, password });
-        return response.data; // Retorna { _id, name, email, type, token, message }
+        // O Backend Supabase retorna os dados de usuário e token
+        return response.data; 
     } catch (error) {
         // Captura o erro 401 (Credenciais Inválidas) ou 500
-        throw error.response ? error.response.data : new Error('Erro de rede ou conexão.');
+        throw error.response 
+              ? error.response.data 
+              : new Error('Erro de rede ou conexão. Verifique o status do servidor Render.');
     }
 };
-// Você pode adicionar o register aqui futuramente.
+// Você pode adicionar o export para o register aqui, se necessário
