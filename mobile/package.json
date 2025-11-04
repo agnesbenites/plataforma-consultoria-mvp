@@ -1,7 +1,8 @@
 {
   "name": "mobile",
   "version": "1.0.0",
-  "main": "App.js",   "scripts": {
+  "main": "App.js",
+  "scripts": {
     "start": "expo start",
     "android": "expo start --android",
     "ios": "expo start --ios",
@@ -11,8 +12,7 @@
     "expo": "~51.0.14",
     "react": "18.2.0",
     "react-native": "0.74.2",
-    "react-native-web": "~0.19.10", 
-    
+    "react-native-web": "~0.19.10",
     "@react-navigation/native": "^6.1.17",
     "@react-navigation/native-stack": "^6.9.26",
     "axios": "^1.7.2",
@@ -24,5 +24,9 @@
   "devDependencies": {
     "@babel/core": "^7.20.0"
   },
-  "private": true
+  "private": true,
+  "description": "",
+  "keywords": [],
+  "author": "",
+  "license": "ISC"
 }

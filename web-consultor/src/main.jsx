@@ -1,25 +1,24 @@
-// web-consultor/src/main.jsx
+// web-consultor/src/main.jsx (CÓDIGO FINAL E LIMPO)
 
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
-import LoginPage from './pages/LoginPage.jsx'; // Importa sua tela de Login
+import LoginPage from './pages/LoginPage.jsx'; 
+import ConsultantRegisterPage from './pages/ConsultantRegisterPage.jsx'; 
+import DashboardPage from './pages/DashboardPage.jsx'; 
+import TermsPage from './pages/TermsPage.jsx'; 
+// import './App.css'; // <<< REMOVER ESTA LINHA SE ELA EXISTIR
+import './GlobalStyles.css'; // <<< MUDAR AQUI PARA O NOVO NOME
+import './index.css';
 
-// Componente Placeholder para a Dashboard (que criaremos depois)
-const DashboardPage = () => <h1>Dashboard do Consultor</h1>; 
 
-// O App Principal que define as rotas
 const AppRoutes = () => (
     <Router>
         <Routes>
-            {/* Rota principal: / */}
             <Route path="/" element={<LoginPage />} />
-            
-            {/* Rota do Dashboard: /dashboard */}
+            <Route path="/register-consultor" element={<ConsultantRegisterPage />} /> 
             <Route path="/dashboard" element={<DashboardPage />} /> 
-
-            {/* Futuramente: Rota para o Chat (ex: /chat/:id) */}
-            {/* Você pode adicionar rotas aqui */}
+            <Route path="/terms" element={<TermsPage />} /> 
         </Routes>
     </Router>
 );

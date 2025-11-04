@@ -1,4 +1,4 @@
-// web-consultor/src/pages/LoginPage.jsx
+// web-consultor/src/pages/LoginPage.jsx (CÓDIGO FINAL COM LINK PARA CADASTRO AVANÇADO)
 
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -8,7 +8,7 @@ const LoginPage = () => {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [error, setError] = useState('');
-    const [isHovering, setIsHovering] = useState(false); // Novo estado para lidar com hover no React
+    const [isHovering, setIsHovering] = useState(false); 
     const navigate = useNavigate();
 
     const handleSubmit = async (e) => {
@@ -66,14 +66,25 @@ const LoginPage = () => {
                     />
                     <button 
                         type="submit" 
-                        style={buttonStyle} // Aplica o estilo dinâmico
-                        onMouseEnter={() => setIsHovering(true)} // Lógica de Hover (Mouse Entra)
-                        onMouseLeave={() => setIsHovering(false)} // Lógica de Hover (Mouse Sai)
+                        style={buttonStyle}
+                        onMouseEnter={() => setIsHovering(true)}
+                        onMouseLeave={() => setIsHovering(false)}
                     >
                         Entrar
                     </button>
                     {error && <p style={styles.error}>{error}</p>}
                 </form>
+                
+                {/* >>> NOVO LINK PARA CADASTRO AVANÇADO <<< */}
+                <p style={styles.registerLinkContainer}>
+                    Novo por aqui? 
+                    <button 
+                        onClick={() => navigate('/register-consultor')} // Chama a rota do cadastro de 3 passos
+                        style={styles.textButton}
+                    >
+                        Cadastre-se como Consultor
+                    </button>
+                </p>
             </div>
         </div>
     );
@@ -120,7 +131,7 @@ const styles = {
     button: { 
         width: '100%', 
         padding: '12px', 
-        backgroundColor: '#364fab', // <<< COR PRINCIPAL: #364fab
+        backgroundColor: '#364fab', 
         color: 'white', 
         border: 'none', 
         borderRadius: '5px', 
@@ -130,13 +141,28 @@ const styles = {
         fontWeight: 'bold',
         transition: 'background-color 0.3s ease',
     },
-    buttonHover: { // <<< EFEITO DE HOVER: Cor mais escura
+    buttonHover: { 
         backgroundColor: '#2c3d9a', 
     },
     error: { 
         color: '#d9534f', 
         marginTop: '15px',
         fontSize: '14px',
+    },
+    // NOVOS ESTILOS PARA O LINK DE CADASTRO
+    registerLinkContainer: {
+        marginTop: '20px',
+        fontSize: '14px',
+    },
+    textButton: {
+        background: 'none',
+        border: 'none',
+        color: '#364fab',
+        textDecoration: 'underline',
+        cursor: 'pointer',
+        marginLeft: '5px',
+        fontSize: '14px',
+        fontWeight: 'bold',
     },
 };
 

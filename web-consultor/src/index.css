@@ -1,0 +1,13 @@
+/* web-consultor/src/index.css */
+
+html, body, #root {
+    /* Força a altura mínima a ser 100% da viewport (janela de visualização) */
+    min-height: 100vh;
+    /* Permite rolagem vertical caso o conteúdo exceda 100vh */
+    overflow-y: auto; 
+    
+    width: 100%;
+    margin: 0;
+    padding: 0;
+    font-family: Arial, Helvetica, sans-serif; 
+}
