@@ -1,8 +1,5 @@
 /* web-consultor/src/App.css (CÓDIGO FINAL E LIMPO) */
-
-/* Removendo restrições que podem causar conflito com a altura da página de Termos */
 #root {
-  /* Mantido apenas o text-align, o resto será controlado por estilos específicos dos componentes. */
   text-align: center;
 }
 

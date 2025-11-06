@@ -1,370 +1,881 @@
-// web-consultor/src/components/ChatPanel.jsx (CÓDIGO FINAL COM REGRAS DE NEGÓCIO E CARRINHO)
+import React, { useState, useEffect, useRef } from "react";
 
-import React, { useState, useEffect, useRef } from 'react';
-import Message from './Message'; 
-import { supabase } from '../supabase'; 
+// --- Constantes de Estilo Compartilhadas (Minimalista) ---
+const PRIMARY_COLOR = "#007bff";
+const SECONDARY_COLOR = "#495057";
+const LIGHT_GREY = "#f8f9fa";
 
-// --- NOVO: LÓGICA DO CARRINHO DE COMPRAS ---
-const ShoppingCart = ({ cartItems, onRemoveItem, onGenerateQRCode }) => {
-    const total = cartItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
+// --- Componente Placeholder para Mensagem (Resolvendo o erro de importação) ---
+const Message = ({ user, content, type, timestamp }) => {
+  const isConsultor = type === "outbound";
+  // Estilos ajustados para minimalismo: cores suaves
+  const align = isConsultor ? "flex-end" : "flex-start";
+  const backgroundColor = isConsultor ? "#e9eff6" : "#ffffff"; // Cinza/Azul claro suave
+  const color = "#333";
 
-    return (
-        <div style={styles.cartContainer}>
-            <h4 style={styles.cartTitle}>🛒 Carrinho do Cliente</h4>
-            <div style={styles.cartItemsList}>
-                {cartItems.length === 0 ? (
-                    <p style={styles.noResults}>Carrinho vazio.</p>
-                ) : (
-                    cartItems.map((item, index) => (
-                        <div key={index} style={styles.cartItem}>
-                            <p style={styles.itemName}>
-                                {item.name} ({item.quantity}x)
-                                <span style={styles.itemPrice}>R$ {(item.price * item.quantity).toFixed(2)}</span>
-                            </p>
-                            <button onClick={() => onRemoveItem(item.id)} style={styles.removeButton}>Editar/Remover</button>
-                        </div>
-                    ))
-                )}
-            </div>
-            
-            <p style={styles.cartTotal}>Total: <strong>R$ {total.toFixed(2)}</strong></p>
+  const style = {
+    alignSelf: align,
+    maxWidth: "70%",
+    padding: "10px 15px",
+    margin: "5px 0",
+    borderRadius: "12px", // Cantos arredondados suaves
+    backgroundColor: backgroundColor,
+    color: color,
+    boxShadow: "0 1px 2px rgba(0,0,0,0.08)", // Sombra mais discreta
+    textAlign: "left",
+    display: "flex",
+    flexDirection: "column",
+  };
 
-            <button 
-                onClick={onGenerateQRCode} 
-                disabled={cartItems.length === 0} 
-                style={styles.qrButton}
-            >
-                Gerar QR Code (Fechar Carrinho)
-            </button>
-        </div>
-    );
+  const userStyle = {
+    fontSize: "0.7rem",
+    color: isConsultor ? PRIMARY_COLOR : SECONDARY_COLOR, // Azul sutil para consultor, cinza escuro para cliente
+    marginBottom: "3px",
+    fontWeight: "600",
+    textAlign: "left",
+  };
+
+  const timestampStyle = {
+    fontSize: "0.65rem",
+    color: "#999",
+    marginTop: "5px",
+    display: "block",
+    textAlign: "right",
+    alignSelf: "flex-end",
+  };
+
+  return (
+    <div style={style}>
+      <span style={userStyle}>{user}</span>
+      <p style={{ margin: 0, overflowWrap: "break-word" }}>{content}</p>
+      <span style={timestampStyle}>{timestamp}</span>
+    </div>
+  );
 };
+// FIM do Componente Placeholder
 
+// --- Mock de Dados ---
+const MOCK_PRODUCTS = [
+  {
+    id: "SKU001",
+    name: "Geladeira Inverter 400L",
+    price: 3499.0,
+    available: 5,
+    specs: "Tecnologia No Frost, Inverter, A+++",
+    category: "Eletrodomésticos",
+  },
+  {
+    id: "SKU002",
+    name: 'Smart TV 55" OLED 4K',
+    price: 4899.0,
+    available: 2,
+    specs: "Painel OLED, 120Hz, HDMI 2.1",
+    category: "Tecnologia",
+  },
+  {
+    id: "SKU003",
+    name: "Notebook Gamer Pro",
+    price: 8200.0,
+    available: 10,
+    specs: "i7, 16GB RAM, RTX 4060",
+    category: "Tecnologia",
+  },
+  {
+    id: "SKU004",
+    name: "Máquina de Lavar 12Kg",
+    price: 1950.0,
+    available: 8,
+    specs: "Ciclo rápido, 12 programas, Cesto Inox",
+    category: "Eletrodomésticos",
+  },
+  {
+    id: "SKU005",
+    name: "Fritadeira AirFryer 5L",
+    price: 450.0,
+    available: 20,
+    specs: "Display digital, 8 predefinições",
+    category: "Eletrodomésticos",
+  },
+];
 
-// --- COLUNA DE BUSCA DE ESTOQUE ---
-const InventorySearch = ({ onInsertProduct }) => {
-    // ... (Lógica de busca de estoque mockada - MANTIDA) ...
-    const [searchTerm, setSearchTerm] = useState('');
-    const [searchResults, setSearchResults] = useState([]);
-    const [loading, setLoading] = useState(false);
+// --- Mock de Chat ---
+const initialMessages = [
+  {
+    id: 1,
+    user: "CLI-001",
+    content: "Olá, preciso de ajuda para escolher uma TV para minha sala.",
+    timestamp: "10:00",
+    type: "inbound",
+  },
+  {
+    id: 2,
+    user: "Consultor",
+    content:
+      "Olá! Com certeza posso ajudar. Qual é o tamanho ideal que você busca?",
+    timestamp: "10:01",
+    type: "outbound",
+  },
+];
 
-    const mockInventory = [
-        { id: 1, name: 'Geladeira Inverter', sku: 'INVT001', stock: 5, price: 2499.00 },
-        { id: 2, name: 'Smart TV 55" 4K', sku: 'TV55K', stock: 12, price: 3150.00 },
-        { id: 3, name: 'Fone BT PowerBass', sku: 'FB002', stock: 120, price: 499.00 },
-    ];
-
-    const handleSearch = () => {
-        setLoading(true);
-        const results = mockInventory.filter(item => 
-            item.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-            item.sku.toLowerCase().includes(searchTerm.toLowerCase())
-        );
-        setTimeout(() => {
-            setSearchResults(results);
-            setLoading(false);
-        }, 500);
-    };
-
-    return (
-        <div style={styles.inventorySearchContainer}>
-            <h4 style={styles.inventoryTitle}>Busca Rápida de Estoque</h4>
-            <div style={styles.searchBar}>
-                <input 
-                    type="text"
-                    placeholder="Buscar SKU ou Produto..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    onKeyDown={(e) => { if (e.key === 'Enter') handleSearch(); }}
-                    style={styles.inventoryInput}
-                />
-                <button onClick={handleSearch} style={styles.searchButton}>
-                    {loading ? '...' : 'Buscar'}
-                </button>
-            </div>
-            
-            <div style={styles.resultsList}>
-                {searchResults.length > 0 ? (
-                    searchResults.map(item => (
-                        <div key={item.id} style={styles.productItem}>
-                            <p style={styles.productName}>{item.name}</p>
-                            <p style={styles.productDetails}>
-                                SKU: {item.sku} | Estoque: <strong style={{color: item.stock < 20 ? 'red' : 'green'}}>{item.stock}</strong> un.
-                                <br/>Preço: R$ {item.price.toFixed(2)}
-                            </p>
-                            <button 
-                                onClick={() => onInsertProduct(item)} 
-                                style={styles.insertButton}
-                            >
-                                Inserir Produto
-                            </button>
-                        </div>
-                    ))
-                ) : (
-                    <p style={styles.noResults}>{searchTerm.length > 0 && !loading ? 'Nenhum produto encontrado.' : 'Digite para buscar.'}</p>
-                )}
-            </div>
-        </div>
-    );
-};
-
-
-// --- CHAT PRINCIPAL ---
 const ChatPanel = () => {
-    // === ESTADOS DO CHAT E CARRINHO ===
-    const [messages, setMessages] = useState([]);
-    const [input, setInput] = useState('');
-    const [cart, setCart] = useState([]);
-    const [timer, setTimer] = useState(900); // 15 minutos = 900 segundos
-    const [isTimerActive, setIsTimerActive] = useState(false);
-    const [clients, setClients] = useState([
-        // CLIENTES MOCKADOS: Agora usam ID e têm a flag 'inStore'
-        { id: 'cli-735', name: '?', inStore: true, lastMessage: 'Olá, estou na loja X. Pode me ajudar?' },
-        { id: 'cli-481', name: '?', inStore: false, lastMessage: 'Queria saber sobre TVs.' },
-    ]);
-    const [activeClient, setActiveClient] = useState(clients[0]);
+  const messagesEndRef = useRef(null);
+  const userName = localStorage.getItem("userName") || "Consultor(a)";
 
-    const timerRef = useRef();
+  // Estados
+  const [messages, setMessages] = useState(initialMessages);
+  const [input, setInput] = useState("");
+  const [searchTerm, setSearchTerm] = useState("");
+  const [cart, setCart] = useState([]);
+  const [showDetails, setShowDetails] = useState(null); // Produto selecionado para detalhes
+  const [modalVisible, setModalVisible] = useState(false); // Modal de QR Code/Finalização
 
+  // Lógica de Busca de Produtos
+  const filteredProducts = MOCK_PRODUCTS.filter(
+    (p) =>
+      p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      p.id.toLowerCase().includes(searchTerm.toLowerCase())
+  );
 
-    // --- LÓGICA DE TEMPO (15 MINUTOS) ---
-    useEffect(() => {
-        // Zera o timer ao trocar de cliente
-        setTimer(900); 
-        setIsTimerActive(activeClient.inStore); // Ativa SÓ se o cliente estiver na loja
+  // Auto-scroll para a última mensagem
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages]);
 
-        if (timerRef.current) {
-            clearInterval(timerRef.current);
-        }
+  // --- Funções de Chat ---
+  const handleSendMessage = (e) => {
+    e.preventDefault();
+    if (input.trim() === "") return;
 
-        if (activeClient.inStore) {
-            timerRef.current = setInterval(() => {
-                setTimer(prev => {
-                    if (prev <= 1) {
-                        clearInterval(timerRef.current);
-                        alert(`Tempo limite de atendimento esgotado para o Cliente ${activeClient.id} na loja!`);
-                        setIsTimerActive(false);
-                        return 0;
-                    }
-                    return prev - 1;
-                });
-            }, 1000);
-        }
-
-        // Cleanup
-        return () => clearInterval(timerRef.current);
-    }, [activeClient]);
-
-    // Lógica Real-time e Histórico (MANTIDA)
-    useEffect(() => {
-        setMessages([
-            { id: 1, user: activeClient.id, content: activeClient.lastMessage, timestamp: '01:06:52', type: 'inbound' },
-        ]);
-        const channel = supabase.channel('chat_room');
-        channel.subscribe(); 
-        return () => channel.unsubscribe();
-    }, [activeClient]);
-
-
-    const formatTime = (seconds) => {
-        const minutes = Math.floor(seconds / 60);
-        const remainingSeconds = seconds % 60;
-        return `${minutes}:${remainingSeconds < 10 ? '0' : ''}${remainingSeconds}`;
+    const newMessage = {
+      id: messages.length + 1,
+      user: "Consultor",
+      content: input,
+      timestamp: new Date().toLocaleTimeString("pt-BR", {
+        hour: "2-digit",
+        minute: "2-digit",
+      }),
+      type: "outbound",
     };
 
-    // --- LÓGICA DO CARRINHO ---
-    const handleInsertProduct = (product) => {
-        // Checa se o produto já está no carrinho
-        const existingItem = cart.find(item => item.id === product.id);
-        if (existingItem) {
-            setCart(cart.map(item => 
-                item.id === product.id ? { ...item, quantity: item.quantity + 1 } : item
-            ));
-        } else {
-            setCart([...cart, { ...product, quantity: 1 }]);
-        }
+    setMessages([...messages, newMessage]);
+    setInput("");
+  };
 
-        // Insere mensagem no chat
-        const productMessage = `Adicionei 1x ${product.name} (SKU: ${product.sku}) ao carrinho.`;
-        setMessages(prev => [...prev, { id: prev.length + 1, user: 'Consultor', content: productMessage, timestamp: new Date().toLocaleTimeString().substring(0, 7), type: 'system' }]);
-    };
+  // --- Funções de Vendas ---
+  const handleAddToCart = (product) => {
+    const existingItem = cart.find((item) => item.id === product.id);
+    if (existingItem) {
+      setCart(
+        cart.map((item) =>
+          item.id === product.id
+            ? { ...item, quantity: item.quantity + 1 }
+            : item
+        )
+      );
+    } else {
+      setCart([...cart, { ...product, quantity: 1 }]);
+    }
+  };
 
-    const handleRemoveItem = (id) => {
-        setCart(cart.filter(item => item.id !== id));
-    };
+  const updateCartQuantity = (id, change) => {
+    setCart(
+      cart
+        .map((item) =>
+          item.id === id
+            ? { ...item, quantity: Math.max(0, item.quantity + change) }
+            : item
+        )
+        .filter((item) => item.quantity > 0)
+    ); // Remove se a quantidade for 0
+  };
 
-    const handleGenerateQRCode = () => {
-        alert(`QR Code Gerado! Enviando e-mail para o cliente ${activeClient.id} com a lista de produtos. (Compra finalizada e pronta para pagamento no caixa)`);
-        setCart([]); // Limpa o carrinho após fechar a compra
+  const calculateTotal = () => {
+    return cart
+      .reduce((total, item) => total + item.price * item.quantity, 0)
+      .toFixed(2);
+  };
 
-        // Lógica futura: API call para gerar QR e enviar e-mail (Item 4)
-    };
-    
-    // --- LÓGICA DE CHAT ---
-    const handleSend = (e) => {
-        e.preventDefault();
-        if (input.trim() === '') return;
+  const handleFinalizeSale = () => {
+    if (cart.length === 0) {
+      console.error("O carrinho está vazio.");
+      return;
+    }
+    // Lógica para simular a geração de QR Code e envio de e-mail
+    setModalVisible(true);
+  };
 
-        const newMessage = {
-            id: messages.length + 1,
-            user: 'Consultor',
-            content: input,
-            timestamp: new Date().toLocaleTimeString().substring(0, 7),
-            type: 'outbound',
-        };
-        
-        setMessages([...messages, newMessage]);
-        setInput('');
-    };
-
-    const handleCall = (type) => {
-        // Lógica de restrição de vídeo (Item 3 - Mock: apenas 'cli-735' permite vídeo)
-        if (type === 'Vídeo Chamada' && activeClient.id === 'cli-481') {
-             alert('Atenção: A loja associada a este cliente não permite Vídeo Chamada neste plano.');
-             return;
-        }
-        alert(`Iniciando ${type} com o Cliente ${activeClient.id}... (Simulação)`);
-    };
-
-
-    // --- RENDERIZAÇÃO ---
+  // --- Renderização de Componentes Internos ---
+  const renderProductDetails = () => {
+    if (!showDetails) return null;
     return (
-        <div style={styles.fullContainer}> 
-            
-            {/* 1. Coluna de Clientes (SÓ MOSTRA O ID) */}
-            <div style={styles.clientList}>
-                <h3 style={styles.listTitle}>Clientes na Fila ({clients.length})</h3>
-                {clients.map(client => (
-                    <div 
-                        key={client.id} 
-                        style={{...styles.clientItem, backgroundColor: client.id === activeClient.id ? '#364fab' : 'transparent', color: client.id === activeClient.id ? 'white' : 'black'}}
-                        onClick={() => setActiveClient(client)}
-                    >
-                        <p style={{margin: 0, fontWeight: 'bold'}}>ID: {client.id}</p>
-                        <span style={styles.lastMessage}>{client.lastMessage.substring(0, 30)}...</span>
-                        {client.inStore && <span style={styles.inStoreTag}>Na Loja</span>}
-                    </div>
-                ))}
-            </div>
-
-            {/* 2. Coluna Principal do Chat */}
-            <div style={styles.chatArea}>
-                <div style={styles.chatHeader}>
-                    <h2 style={styles.chatHeaderTitle}>Atendimento: ID {activeClient.id}</h2>
-                    <div style={styles.callButtons}>
-                        {activeClient.inStore && (
-                            <span style={{...styles.timerBox, backgroundColor: timer <= 120 ? '#dc3545' : '#1b3670'}}>
-                                ⏱️ {formatTime(timer)}
-                            </span>
-                        )}
-                        <button onClick={() => handleCall('Vídeo Chamada')} style={styles.videoButton}>
-                            🎥 Vídeo
-                        </button>
-                        <button onClick={() => handleCall('Áudio')} style={styles.audioButton}>
-                            🎙️ Áudio
-                        </button>
-                    </div>
-                </div>
-
-                <div style={styles.messagesContainer}>
-                    {messages.map(msg => (
-                        <Message key={msg.id} content={msg.content} user={msg.user} type={msg.type} timestamp={msg.timestamp} />
-                    ))}
-                    {activeClient.name === '?' && (
-                        <p style={styles.nameQuery}>*O cliente ainda não forneceu o nome. Use o chat para perguntar: 'Como você gostaria de ser chamado(a)?'</p>
-                    )}
-                </div>
-
-                <form onSubmit={handleSend} style={styles.inputContainer}>
-                    <input
-                        type="text"
-                        value={input}
-                        onChange={(e) => setInput(e.target.value)}
-                        placeholder="Digite sua mensagem ou insira um produto..."
-                        style={styles.inputField}
-                    />
-                    <button type="submit" style={styles.sendButton}>Enviar</button>
-                </form>
-            </div>
-
-            {/* 3. Coluna de Estoque e Carrinho */}
-            <div style={styles.inventoryAndCartContainer}>
-                <InventorySearch onInsertProduct={handleInsertProduct} />
-                <ShoppingCart 
-                    cartItems={cart} 
-                    onRemoveItem={handleRemoveItem} 
-                    onGenerateQRCode={handleGenerateQRCode} 
-                />
-            </div>
-        </div>
+      <div style={styles.detailsModal}>
+        <h5 style={{ fontSize: "1.2rem", marginBottom: "10px" }}>
+          {showDetails.name}
+        </h5>
+        <p style={styles.specItem}>**SKU:** {showDetails.id}</p>
+        <p style={styles.specItem}>
+          **Preço:** R$ {showDetails.price.toFixed(2)}
+        </p>
+        <p style={styles.specItem}>
+          **Estoque:** {showDetails.available} unidades
+        </p>
+        <p style={styles.specItem}>**Especificações:** {showDetails.specs}</p>
+        <button
+          onClick={() => {
+            handleAddToCart(showDetails);
+            setShowDetails(null);
+          }}
+          style={{
+            ...styles.actionButton,
+            backgroundColor: PRIMARY_COLOR,
+            marginTop: "10px",
+          }}
+        >
+          Adicionar ao Carrinho ({showDetails.id})
+        </button>
+        <button
+          onClick={() => setShowDetails(null)}
+          style={{
+            ...styles.secondaryButton,
+            marginTop: "10px",
+            marginLeft: "10px",
+          }}
+        >
+          Fechar
+        </button>
+      </div>
     );
+  };
+
+  const renderCart = () => (
+    <div style={styles.cartContainer}>
+      <h4 style={styles.cartTitle}>🛒 Carrinho ({cart.length})</h4>
+      {cart.length === 0 ? (
+        <p style={{ fontSize: "0.9rem", color: "#6c757d" }}>
+          Nenhum produto adicionado.
+        </p>
+      ) : (
+        <>
+          {cart.map((item) => (
+            <div key={item.id} style={styles.cartItem}>
+              <span style={{ flex: 1, fontSize: "0.9rem" }}>{item.name}</span>
+              <div style={styles.cartQuantityControl}>
+                <button
+                  onClick={() => updateCartQuantity(item.id, -1)}
+                  style={styles.quantityButton}
+                >
+                  -
+                </button>
+                <span style={{ margin: "0 8px" }}>{item.quantity}</span>
+                <button
+                  onClick={() => updateCartQuantity(item.id, 1)}
+                  style={styles.quantityButton}
+                >
+                  +
+                </button>
+              </div>
+              <span
+                style={{
+                  width: "90px",
+                  textAlign: "right",
+                  fontWeight: "bold",
+                  color: "#dc3545",
+                }}
+              >
+                R$ {(item.price * item.quantity).toFixed(2)}
+              </span>
+            </div>
+          ))}
+          <div style={styles.cartTotal}>
+            <span>TOTAL:</span>
+            <span>R$ {calculateTotal()}</span>
+          </div>
+          <button
+            onClick={handleFinalizeSale}
+            style={{
+              ...styles.actionButton,
+              backgroundColor: PRIMARY_COLOR,
+              width: "100%",
+              marginTop: "15px",
+            }}
+          >
+            Finalizar Venda & Gerar QR Code
+          </button>
+        </>
+      )}
+    </div>
+  );
+
+  const renderProductSearch = () => (
+    <>
+      <div style={styles.searchBox}>
+        <input
+          type="text"
+          value={searchTerm}
+          onChange={(e) => {
+            setSearchTerm(e.target.value);
+            setShowDetails(null); // Fecha detalhes ao buscar
+          }}
+          placeholder="Buscar produto (Nome, SKU, QR Code)"
+          style={styles.searchInput}
+        />
+        <button style={styles.searchButton}>🔍</button>
+      </div>
+
+      {renderProductDetails()}
+
+      <div style={styles.productList}>
+        {filteredProducts.map((p) => (
+          <div key={p.id} style={styles.productCard}>
+            <div style={styles.productInfo}>
+              <strong style={{ fontSize: "0.95rem" }}>{p.name}</strong>
+              <span style={{ fontSize: "0.85rem", color: "#6c757d" }}>
+                SKU: {p.id}
+              </span>
+            </div>
+            <div style={styles.productActions}>
+              <span style={{ fontWeight: "bold", color: PRIMARY_COLOR }}>
+                R$ {p.price.toFixed(2)}
+              </span>
+              <button
+                onClick={() => setShowDetails(p)}
+                style={styles.detailsButton}
+              >
+                + Info
+              </button>
+            </div>
+          </div>
+        ))}
+      </div>
+    </>
+  );
+
+  return (
+    <div style={styles.appContainer}>
+      {/* 1. Modal de Finalização (Simulado) */}
+      {modalVisible && (
+        <div style={styles.modalOverlay}>
+          <div style={styles.modalContent}>
+            <h3>Venda Finalizada com Sucesso!</h3>
+            <p>O total da compra é de **R$ {calculateTotal()}**.</p>
+            <div style={styles.qrCodeContainer}>
+              {/* QR Code Simulado */}
+              <span style={{ fontSize: "3rem" }}>🔗</span>
+              <p>QR Code gerado para leitura no caixa.</p>
+            </div>
+            <p style={{ marginTop: "15px", color: "#dc3545" }}>
+              A lista de produtos também foi enviada por e-mail para o cliente.
+            </p>
+            <button
+              onClick={() => {
+                setModalVisible(false);
+                setCart([]);
+              }}
+              style={{
+                ...styles.actionButton,
+                backgroundColor: SECONDARY_COLOR,
+                width: "100%",
+                marginTop: "20px",
+              }}
+            >
+              Fechar e Limpar Carrinho
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* 2. Menu Lateral (Compacto) */}
+      <nav style={styles.sidebar}>
+        <div style={styles.sidebarContent}>
+          {/* Botão Home */}
+          <a
+            href="/dashboard"
+            style={{ ...styles.sidebarButton, textDecoration: "none" }}
+          >
+            <span style={styles.sidebarIcon}>🏠</span>
+            <span style={styles.sidebarText}>Home</span>
+          </a>
+          {/* Botão Chat (Ativo) */}
+          <div style={{ ...styles.sidebarButton, backgroundColor: "#0056b3" }}>
+            <span style={styles.sidebarIcon}>💬</span>
+            <span style={styles.sidebarText}>Chat</span>
+          </div>
+          {/* Botão Analytics */}
+          <a
+            href="/analytics"
+            style={{ ...styles.sidebarButton, textDecoration: "none" }}
+          >
+            <span style={styles.sidebarIcon}>📊</span>
+            <span style={styles.sidebarText}>Analítico</span>
+          </a>
+          {/* Botão Perfil */}
+          <a
+            href="/profile"
+            style={{ ...styles.sidebarButton, textDecoration: "none" }}
+          >
+            <span style={styles.sidebarIcon}>👤</span>
+            <span style={styles.sidebarText}>Perfil</span>
+          </a>
+        </div>
+      </nav>
+
+      {/* 3. Conteúdo Principal (3 Colunas: Clientes | Chat | Vendas) */}
+      <main style={styles.mainContent}>
+        {/* Header Superior com Perfil (PADRÃO) */}
+        <header style={styles.header}>
+          <h1 style={styles.headerTitle}>Atendimento ao Cliente</h1>
+          <a href="/profile" style={styles.profileLink}>
+            <span style={styles.profileName}>{userName}</span>
+            <img
+              src="https://placehold.co/40x40/007bff/ffffff?text=C"
+              alt="Foto do Consultor"
+              style={styles.profilePic}
+            />
+          </a>
+        </header>
+
+        <div style={styles.chatLayout}>
+          {/* Coluna 1: Lista de Clientes (Compacta) */}
+          <div style={styles.clientsColumn}>
+            <h3 style={styles.clientsTitle}>Clientes</h3>
+            <div
+              style={{
+                ...styles.clientCard,
+                borderLeft: "4px solid " + PRIMARY_COLOR,
+              }}
+            >
+              <strong style={{ fontSize: "0.9rem" }}>CLI-001 (Ativo)</strong>
+              <span style={{ fontSize: "0.8rem", color: "#6c757d" }}>
+                Em busca de TV
+              </span>
+            </div>
+            <div style={{ ...styles.clientCard, borderLeft: "4px solid #ddd" }}>
+              <strong style={{ fontSize: "0.9rem" }}>CLI-002</strong>
+              <span style={{ fontSize: "0.8rem", color: "#6c757d" }}>
+                Pendente
+              </span>
+            </div>
+          </div>
+
+          {/* Coluna 2: Área de Chat e Ações */}
+          <div style={styles.chatColumn}>
+            <div style={styles.chatHeader}>
+              <h2 style={{ fontSize: "1.2rem", color: SECONDARY_COLOR }}>
+                Atendimento: CLI-001
+              </h2>
+              <div style={styles.callActions}>
+                {/* Botões de Ação de Chamada em estilo outline/sutil */}
+                <button style={styles.callButton}>📞 Áudio</button>
+                <button style={styles.callButton}>📹 Vídeo</button>
+                <button
+                  style={{
+                    ...styles.callButton,
+                    color: "#dc3545",
+                    border: "1px solid #dc3545",
+                  }}
+                >
+                  ❌ Encerrar
+                </button>
+              </div>
+            </div>
+
+            <div style={styles.messagesArea}>
+              {messages.map((msg) => (
+                <Message
+                  key={msg.id}
+                  content={msg.content}
+                  user={msg.user}
+                  type={msg.type}
+                  timestamp={msg.timestamp}
+                />
+              ))}
+              <div ref={messagesEndRef} /> {/* Ponto de rolagem */}
+            </div>
+
+            <form onSubmit={handleSendMessage} style={styles.messageForm}>
+              <input
+                type="text"
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                placeholder="Digite sua mensagem ou envie um produto..."
+                style={styles.messageInput}
+              />
+              <button type="submit" style={styles.sendButton}>
+                Enviar 💬
+              </button>
+            </form>
+          </div>
+
+          {/* Coluna 3: Painel de Produtos e Vendas */}
+          <div style={styles.productsColumn}>
+            <h3 style={styles.productsTitle}>Assistente de Vendas</h3>
+            <div style={styles.productSalesArea}>{renderProductSearch()}</div>
+            {renderCart()}
+          </div>
+        </div>
+      </main>
+    </div>
+  );
 };
 
-
-// === ESTILOS PARA CHAT, CARRINHO E INVENTÁRIO ===
+// --- Estilos Minimalistas ---
 const styles = {
-    fullContainer: {
-        display: 'grid',
-        gridTemplateColumns: '250px 1fr 300px', /* Clientes, Chat, Estoque/Carrinho */
-        width: '100%', 
-        height: '100%',
-        backgroundColor: '#f8f9fa',
-        fontFamily: 'Arial, sans-serif',
-    },
-    // 1. CLIENTES
-    clientList: {
-        backgroundColor: '#f1f1f1',
-        borderRight: '1px solid #ddd',
-        overflowY: 'auto',
-    },
-    listTitle: { padding: '15px', margin: 0, backgroundColor: '#e9ecef', color: '#343a40', fontSize: '16px', },
-    clientItem: { padding: '15px', borderBottom: '1px solid #e1e1e1', cursor: 'pointer', position: 'relative', transition: 'background-color 0.2s', },
-    lastMessage: { fontSize: '12px', color: '#888' },
-    inStoreTag: { padding: '3px 8px', backgroundColor: '#ffc107', color: '#333', fontSize: '11px', borderRadius: '3px', marginLeft: '5px' },
-    // 2. CHAT PRINCIPAL
-    chatArea: { display: 'flex', flexDirection: 'column', backgroundColor: 'white', borderRight: '1px solid #ddd', },
-    chatHeader: { padding: '15px 20px', borderBottom: '1px solid #ddd', backgroundColor: '#f9f9f9', display: 'flex', justifyContent: 'space-between', alignItems: 'center', },
-    chatHeaderTitle: { margin: 0, color: '#1b3670' },
-    callButtons: { display: 'flex', gap: '10px', alignItems: 'center' },
-    videoButton: { padding: '8px 15px', backgroundColor: '#dc3545', color: 'white', border: 'none', borderRadius: '5px', cursor: 'pointer' },
-    audioButton: { padding: '8px 15px', backgroundColor: '#ffc107', color: 'black', border: 'none', borderRadius: '5px', cursor: 'pointer' },
-    timerBox: { padding: '8px 10px', color: 'white', borderRadius: '5px', fontWeight: 'bold' }, // NOVO ESTILO TIMER
-    messagesContainer: { flexGrow: 1, padding: '20px', overflowY: 'auto', display: 'flex', flexDirection: 'column', backgroundColor: '#f5f5f5', },
-    nameQuery: { fontStyle: 'italic', color: '#6c757d', textAlign: 'center', marginTop: '10px' },
-    inputContainer: { padding: '10px 20px', borderTop: '1px solid #ddd', display: 'flex', },
-    inputField: { flexGrow: 1, padding: '10px', borderRadius: '5px 0 0 5px', border: '1px solid #ccc' },
-    sendButton: { padding: '10px 15px', backgroundColor: '#1b3670', color: 'white', border: 'none', borderRadius: '0 5px 5px 0', cursor: 'pointer' },
-    // 3. ESTOQUE E CARRINHO
-    inventoryAndCartContainer: {
-        padding: '15px',
-        backgroundColor: '#fff',
-        borderLeft: '1px solid #ddd',
-        overflowY: 'auto',
-        display: 'flex',
-        flexDirection: 'column',
-    },
-    // --- ESTILOS DE ESTOQUE ---
-    inventorySearchContainer: { flexShrink: 0, borderBottom: '1px solid #eee', marginBottom: '15px', paddingBottom: '15px' },
-    inventoryTitle: { borderBottom: '1px solid #eee', paddingBottom: '10px', marginBottom: '15px', color: '#1b3670', },
-    searchBar: { display: 'flex', marginBottom: '15px' },
-    inventoryInput: { padding: '8px', borderRadius: '5px 0 0 5px', border: '1px solid #ccc', flexGrow: 1 },
-    searchButton: { padding: '8px 15px', backgroundColor: '#364fab', color: 'white', border: 'none', borderRadius: '0 5px 5px 0', cursor: 'pointer' },
-    resultsList: { marginTop: '10px' },
-    productItem: { border: '1px solid #ddd', borderRadius: '5px', padding: '10px', marginBottom: '10px', backgroundColor: '#f9f9f9', },
-    productName: { margin: '0 0 5px 0', fontWeight: 'bold' },
-    productDetails: { margin: 0, fontSize: '12px', color: '#6c757d' },
-    insertButton: { padding: '5px 10px', backgroundColor: '#28a745', color: 'white', border: 'none', borderRadius: '3px', cursor: 'pointer', marginTop: '8px', width: '100%', },
-    noResults: { color: '#888', textAlign: 'center' },
-    // --- ESTILOS DE CARRINHO ---
-    cartContainer: { flexGrow: 1, paddingTop: '15px' },
-    cartTitle: { borderBottom: '1px solid #eee', paddingBottom: '10px', marginBottom: '15px', color: '#1b3670', },
-    cartItemsList: { marginBottom: '15px' },
-    cartItem: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '5px 0', borderBottom: '1px dotted #ccc' },
-    itemName: { margin: 0, fontSize: '14px', flexGrow: 1 },
-    itemPrice: { fontWeight: 'bold', marginLeft: '10px' },
-    removeButton: { padding: '3px 8px', backgroundColor: '#f0ad4e', color: 'white', border: 'none', borderRadius: '3px', cursor: 'pointer', fontSize: '11px' },
-    cartTotal: { fontSize: '18px', fontWeight: 'bold', borderTop: '2px solid #333', paddingTop: '10px' },
-    qrButton: { width: '100%', padding: '12px', backgroundColor: '#28a745', color: 'white', border: 'none', borderRadius: '5px', cursor: 'pointer', marginTop: '15px', fontWeight: 'bold' },
+  // LAYOUT ESTRUTURAL
+  appContainer: {
+    display: "flex",
+    minHeight: "100vh",
+    backgroundColor: LIGHT_GREY,
+    fontFamily: "Inter, sans-serif",
+  },
+  // 2. Menu Lateral (Compacto)
+  sidebar: {
+    width: "80px", // Aumentado para 80px para padronização
+    backgroundColor: SECONDARY_COLOR,
+    padding: "20px 0",
+    flexShrink: 0,
+    boxShadow: "2px 0 5px rgba(0,0,0,0.1)",
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+  },
+  sidebarContent: {
+    display: "flex",
+    flexDirection: "column",
+    gap: "25px",
+  },
+  sidebarButton: {
+    background: "none",
+    border: "none",
+    color: "white",
+    padding: "12px 0",
+    cursor: "pointer",
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+    gap: "5px",
+    borderRadius: "8px",
+    transition: "background-color 0.2s",
+    textDecoration: "none", // Necessário para links <a>
+  },
+  sidebarIcon: { fontSize: "20px" },
+  sidebarText: { fontSize: "11px" },
+  mainContent: {
+    flex: 1,
+    display: "flex",
+    flexDirection: "column",
+  },
+  // HEADER (Padronizado com HomePanel/AnalyticsPanel)
+  header: {
+    backgroundColor: "white",
+    padding: "15px 30px",
+    borderBottom: "1px solid #eee",
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    boxShadow: "0 2px 4px rgba(0,0,0,0.05)",
+  },
+  headerTitle: {
+    fontSize: "1.5rem",
+    color: SECONDARY_COLOR,
+    margin: 0,
+  },
+  profileLink: {
+    display: "flex",
+    alignItems: "center",
+    textDecoration: "none",
+    color: SECONDARY_COLOR,
+    gap: "10px",
+  },
+  profileName: {
+    fontSize: "1rem",
+    fontWeight: "500",
+  },
+  profilePic: {
+    width: "40px",
+    height: "40px",
+    borderRadius: "50%",
+    border: `2px solid ${PRIMARY_COLOR}`,
+  },
+  // CHAT LAYOUT
+  chatLayout: {
+    display: "grid",
+    gridTemplateColumns: "180px 1fr 350px", // Ajustado para corresponder ao padrão
+    height: "calc(100vh - 70px)", // Subtrai a altura do cabeçalho
+    overflow: "hidden",
+  },
+  // Coluna 1: Clientes
+  clientsColumn: {
+    backgroundColor: "#fff",
+    padding: "15px",
+    borderRight: "1px solid #f0f0f0",
+    overflowY: "auto",
+  },
+  clientsTitle: {
+    fontSize: "1rem",
+    color: SECONDARY_COLOR,
+    borderBottom: "1px solid #f0f0f0",
+    paddingBottom: "10px",
+    marginBottom: "10px",
+    fontWeight: "bold",
+  },
+  clientCard: {
+    backgroundColor: "#fff",
+    padding: "10px",
+    borderRadius: "8px",
+    cursor: "pointer",
+    marginBottom: "8px",
+    display: "flex",
+    flexDirection: "column",
+    gap: "5px",
+    border: "1px solid #eee",
+    transition: "border-color 0.2s",
+  },
+  // Coluna 2: Chat
+  chatColumn: {
+    display: "flex",
+    flexDirection: "column",
+    backgroundColor: "white",
+    borderRight: "1px solid #f0f0f0",
+  },
+  chatHeader: {
+    padding: "15px 20px",
+    borderBottom: "1px solid #eee",
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    backgroundColor: LIGHT_GREY,
+  },
+  callActions: {
+    display: "flex",
+    gap: "10px",
+  },
+  callButton: {
+    padding: "6px 10px",
+    background: "none",
+    border: "1px solid #ccc",
+    borderRadius: "20px",
+    color: SECONDARY_COLOR,
+    fontWeight: "500",
+    cursor: "pointer",
+    fontSize: "0.8rem",
+    transition: "background-color 0.2s, border-color 0.2s",
+  },
+  messagesArea: {
+    flex: 1,
+    padding: "20px",
+    overflowY: "auto",
+    backgroundColor: "#fcfcfc",
+    display: "flex",
+    flexDirection: "column",
+  },
+  messageForm: {
+    padding: "10px 20px",
+    borderTop: "1px solid #eee",
+    display: "flex",
+    gap: "10px",
+    backgroundColor: "white",
+  },
+  messageInput: {
+    flex: 1,
+    padding: "10px 15px",
+    border: "1px solid #ddd",
+    borderRadius: "20px",
+    fontSize: "0.9rem",
+    outline: "none",
+    transition: "border-color 0.2s",
+  },
+  sendButton: {
+    padding: "10px 15px",
+    backgroundColor: PRIMARY_COLOR,
+    color: "white",
+    border: "none",
+    borderRadius: "20px",
+    cursor: "pointer",
+    fontWeight: "bold",
+    transition: "background-color 0.2s",
+  },
+  // Coluna 3: Produtos
+  productsColumn: {
+    backgroundColor: "#fff",
+    padding: "20px 15px",
+    display: "flex",
+    flexDirection: "column",
+    overflowY: "auto",
+  },
+  productsTitle: {
+    fontSize: "1.2rem",
+    color: SECONDARY_COLOR,
+    borderBottom: "1px solid #eee",
+    paddingBottom: "10px",
+    marginBottom: "15px",
+  },
+  productSalesArea: {
+    flex: 1,
+    overflowY: "auto",
+    paddingBottom: "15px",
+  },
+  searchBox: {
+    display: "flex",
+    gap: "5px",
+    marginBottom: "15px",
+  },
+  searchInput: {
+    flex: 1,
+    padding: "10px",
+    border: "1px solid #ddd",
+    borderRadius: "8px",
+    outline: "none",
+  },
+  searchButton: {
+    backgroundColor: PRIMARY_COLOR,
+    color: "white",
+    border: "none",
+    padding: "10px 12px",
+    borderRadius: "8px",
+    cursor: "pointer",
+  },
+  productList: {
+    display: "flex",
+    flexDirection: "column",
+    gap: "8px",
+  },
+  productCard: {
+    backgroundColor: "#fff",
+    padding: "12px",
+    borderRadius: "8px",
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    border: "1px solid #eee",
+  },
+  productInfo: {
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "flex-start",
+  },
+  productActions: {
+    display: "flex",
+    alignItems: "center",
+    gap: "10px",
+  },
+  detailsButton: {
+    backgroundColor: LIGHT_GREY,
+    color: SECONDARY_COLOR,
+    border: "1px solid #ddd",
+    padding: "6px 10px",
+    borderRadius: "5px",
+    cursor: "pointer",
+    fontWeight: "500",
+    fontSize: "0.8rem",
+  },
+  // Carrinho
+  cartContainer: {
+    padding: "15px",
+    borderTop: "1px solid #eee",
+    backgroundColor: LIGHT_GREY,
+    borderRadius: "8px",
+    marginTop: "15px",
+  },
+  cartTitle: {
+    color: SECONDARY_COLOR,
+    borderBottom: "1px solid #ddd",
+    paddingBottom: "10px",
+    marginBottom: "10px",
+    fontSize: "1rem",
+    fontWeight: "bold",
+  },
+  cartItem: {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    padding: "8px 0",
+    borderBottom: "1px dotted #ddd",
+  },
+  cartQuantityControl: {
+    display: "flex",
+    alignItems: "center",
+  },
+  quantityButton: {
+    backgroundColor: "#fff",
+    border: "1px solid #ddd",
+    borderRadius: "4px",
+    padding: "2px 8px",
+    cursor: "pointer",
+    fontSize: "0.8rem",
+    color: SECONDARY_COLOR,
+  },
+  cartTotal: {
+    display: "flex",
+    justifyContent: "space-between",
+    marginTop: "15px",
+    fontSize: "1.1rem",
+    fontWeight: "bold",
+    color: SECONDARY_COLOR,
+  },
+  actionButton: {
+    padding: "10px 15px",
+    border: "none",
+    borderRadius: "8px",
+    color: "white",
+    cursor: "pointer",
+    fontWeight: "bold",
+    transition: "background-color 0.2s",
+  },
+  secondaryButton: {
+    padding: "10px 15px",
+    border: "1px solid #ccc",
+    borderRadius: "8px",
+    color: SECONDARY_COLOR,
+    backgroundColor: "white",
+    cursor: "pointer",
+    fontWeight: "bold",
+    transition: "background-color 0.2s",
+  },
+  // Modal de Detalhes
+  detailsModal: {
+    padding: "15px",
+    marginBottom: "15px",
+    backgroundColor: "#fff",
+    border: "1px solid #ddd",
+    borderRadius: "8px",
+    boxShadow: "0 2px 4px rgba(0,0,0,0.05)",
+    textAlign: "left",
+    position: "relative",
+    zIndex: 10,
+  },
+  specItem: {
+    fontSize: "0.9rem",
+    margin: "3px 0",
+    color: "#6c757d",
+  },
+  // Modal de Finalização (QR Code)
+  modalOverlay: {
+    position: "fixed",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: "rgba(0, 0, 0, 0.4)", // Fundo mais claro
+    display: "flex",
+    justifyContent: "center",
+    alignItems: "center",
+    zIndex: 1000,
+  },
+  modalContent: {
+    backgroundColor: "white",
+    padding: "40px",
+    borderRadius: "10px",
+    width: "450px",
+    textAlign: "center",
+    boxShadow: "0 10px 20px rgba(0, 0, 0, 0.1)",
+  },
+  qrCodeContainer: {
+    marginTop: "20px",
+    padding: "20px",
+    backgroundColor: LIGHT_GREY,
+    borderRadius: "8px",
+    border: "1px solid #ddd",
+  },
 };
 
 export default ChatPanel;
