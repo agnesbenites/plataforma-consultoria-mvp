@@ -1,0 +1,82 @@
+{
+  "expo": {
+    "name": "Compra Smart",
+    "slug": "compra-smart-cliente",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#2c5aa0"
+    },
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.comprasmart.cliente",
+      "infoPlist": {
+        "NSCameraUsageDescription": "Precisamos da câmera para escanear QR Codes das lojas e enviar fotos no chat.",
+        "NSMicrophoneUsageDescription": "Precisamos do microfone para você enviar mensagens de áudio no chat.",
+        "NSLocationWhenInUseUsageDescription": "Precisamos da sua localização para encontrar lojas próximas a você.",
+        "NSLocationAlwaysUsageDescription": "Precisamos da sua localização para encontrar lojas próximas a você.",
+        "NSPhotoLibraryUsageDescription": "Precisamos acessar suas fotos para você enviar imagens no chat."
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#2c5aa0"
+      },
+      "package": "com.comprasmart.cliente",
+      "permissions": [
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE"
+      ]
+    },
+    "plugins": [
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Permitir que Compra Smart acesse sua câmera para escanear QR Codes e enviar fotos."
+        }
+      ],
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "Permitir que Compra Smart acesse sua localização para encontrar lojas próximas."
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Permitir que Compra Smart acesse suas fotos para enviar no chat."
+        }
+      ],
+      [
+        "expo-av",
+        {
+          "microphonePermission": "Permitir que Compra Smart acesse seu microfone para enviar áudios."
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/notification-icon.png",
+          "color": "#2c5aa0"
+        }
+      ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "seu-project-id-aqui"
+      }
+    }
+  }
+}
